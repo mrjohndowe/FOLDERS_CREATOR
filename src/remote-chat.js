@@ -130,27 +130,85 @@ export class RemoteChatBridge {
     throw new Error('Lovense did not finish opening Messages.');
   }
 
-  async signInIfNeeded(username, password) {
+  async signInField(field, value) {
     const result = await this.evaluate(`(()=>{
+      const field=${JSON.stringify(field)};
+      const value=${JSON.stringify(String(value || ''))};
       const visible=item=>item&&item.offsetParent!==null;
       const inputs=[...document.querySelectorAll('input')].filter(visible);
       const passwordInput=inputs.find(item=>String(item.type||'').toLowerCase()==='password');
       if(!passwordInput)return {needed:false};
       const usernameInput=inputs.find(item=>item!==passwordInput&&(String(item.type||'').toLowerCase()==='email'||/user|email|account|login/i.test(String(item.name||'')+' '+String(item.id||'')+' '+String(item.placeholder||''))))||inputs.find(item=>item!==passwordInput);
-      if(!usernameInput)return {needed:true,error:'The Lovense username field was not found.'};
-      const username=${JSON.stringify(clean(username))};
-      const password=${JSON.stringify(String(password || ''))};
-      if(!username||!password)return {needed:true,error:'Save a Lovense username and password in Settings before automatic sign-in can continue.'};
-      const set=(input,value)=>{const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');descriptor.set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));};
-      set(usernameInput,username);set(passwordInput,password);
-      const buttons=[...document.querySelectorAll('button,input[type=submit],[role=button]')].filter(visible);
-      const submit=buttons.find(item=>/sign\s*in|log\s*in|login/i.test(String(item.innerText||item.value||item.getAttribute('aria-label')||'')))||document.querySelector('.login-btn');
-      if(!visible(submit))return {needed:true,error:'The Lovense sign-in button was not found.'};
-      submit.click();
-      return {needed:true,submitted:true};
+      const input=field==='password'?passwordInput:usernameInput;
+      if(!input)return {needed:true,error:field==='password'?'The Lovense password field was not found.':'The Lovense username field was not found.'};
+      const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+      input.focus();
+      descriptor.set.call(input,value);
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+      input.blur();
+      return {needed:true};
     })()`);
     if (result?.error) throw new Error(result.error);
-    if (!result?.needed) return false;
+    if (!result?.needed) return { needed: false, matches: false };
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return this.evaluate(`(()=>{
+      const field=${JSON.stringify(field)};
+      const expected=${JSON.stringify(String(value || ''))};
+      const visible=item=>item&&item.offsetParent!==null;
+      const inputs=[...document.querySelectorAll('input')].filter(visible);
+      const passwordInput=inputs.find(item=>String(item.type||'').toLowerCase()==='password');
+      if(!passwordInput)return {needed:false,matches:false};
+      const usernameInput=inputs.find(item=>item!==passwordInput&&(String(item.type||'').toLowerCase()==='email'||/user|email|account|login/i.test(String(item.name||'')+' '+String(item.id||'')+' '+String(item.placeholder||''))))||inputs.find(item=>item!==passwordInput);
+      const input=field==='password'?passwordInput:usernameInput;
+      return {needed:true,matches:Boolean(input)&&String(input.value||'')===expected};
+    })()`);
+  }
+
+  async signInIfNeeded(username, password) {
+    const savedUsername = clean(username);
+    const savedPassword = String(password || '');
+    if (!savedUsername || !savedPassword) {
+      const loginVisible = await this.evaluate(`Boolean([...document.querySelectorAll('input[type=password]')].find(item=>item.offsetParent!==null))`);
+      if (loginVisible) throw new Error('Save a Lovense username and password in Settings before automatic sign-in can continue.');
+      return false;
+    }
+
+    let credentialsVerified = false;
+    for (let attempt = 1; attempt <= 3 && !credentialsVerified; attempt += 1) {
+      const usernameResult = await this.signInField('username', savedUsername);
+      if (!usernameResult?.needed) return false;
+      if (!usernameResult.matches) continue;
+
+      const passwordResult = await this.signInField('password', savedPassword);
+      if (!passwordResult?.needed) return false;
+      if (!passwordResult.matches) continue;
+
+      const verified = await this.evaluate(`(()=>{
+        const username=${JSON.stringify(savedUsername)};
+        const password=${JSON.stringify(savedPassword)};
+        const visible=item=>item&&item.offsetParent!==null;
+        const inputs=[...document.querySelectorAll('input')].filter(visible);
+        const passwordInput=inputs.find(item=>String(item.type||'').toLowerCase()==='password');
+        if(!passwordInput)return {needed:false,usernameMatches:false,passwordMatches:false};
+        const usernameInput=inputs.find(item=>item!==passwordInput&&(String(item.type||'').toLowerCase()==='email'||/user|email|account|login/i.test(String(item.name||'')+' '+String(item.id||'')+' '+String(item.placeholder||''))))||inputs.find(item=>item!==passwordInput);
+        return {needed:true,usernameMatches:Boolean(usernameInput)&&String(usernameInput.value||'')===username,passwordMatches:String(passwordInput.value||'')===password};
+      })()`);
+      if (!verified?.needed) return false;
+      credentialsVerified = Boolean(verified.usernameMatches && verified.passwordMatches);
+      if (!credentialsVerified && attempt < 3) await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    if (!credentialsVerified) throw new Error('Lovense sign-in form did not keep both saved credentials. No login was submitted.');
+
+    const result = await this.evaluate(`(()=>{
+      const visible=item=>item&&item.offsetParent!==null;
+      const buttons=[...document.querySelectorAll('button,input[type=submit],[role=button]')].filter(visible);
+      const submit=buttons.find(item=>/sign\s*in|log\s*in|login/i.test(String(item.innerText||item.value||item.getAttribute('aria-label')||'')))||document.querySelector('.login-btn');
+      if(!visible(submit))return {error:'The Lovense sign-in button was not found.'};
+      submit.click();
+      return {submitted:true};
+    })()`);
+    if (result?.error) throw new Error(result.error);
     const deadline = Date.now() + 20_000;
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 500));

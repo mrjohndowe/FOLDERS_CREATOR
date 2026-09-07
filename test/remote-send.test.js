@@ -165,8 +165,37 @@ test('classifies the mobile-only Vow game invitation as non-replyable', () => {
 test('remote bridge includes a guarded sign-in path before opening chats', async () => {
   const source = await readFile(new URL('../src/remote-chat.js', import.meta.url), 'utf8');
   assert.match(source, /async signInIfNeeded\(username, password\)/);
+  assert.match(source, /async signInField\(field, value\)/);
   assert.match(source, /input\[type=password\]/);
+  assert.match(source, /for \(let attempt = 1; attempt <= 3 && !credentialsVerified; attempt \+= 1\)/);
+  assert.match(source, /await this\.signInField\('username', savedUsername\)/);
+  assert.match(source, /await this\.signInField\('password', savedPassword\)/);
+  assert.match(source, /verified\.usernameMatches && verified\.passwordMatches/);
+  assert.match(source, /No login was submitted/);
   assert.match(source, /Lovense sign-in did not finish/);
+});
+
+test('sign-in verifies both refreshed form fields before submitting Lovense login', async () => {
+  const bridge = new RemoteChatBridge();
+  const expressions = [];
+  bridge.evaluate = async expression => {
+    expressions.push(expression);
+    if (expression.includes('usernameMatches:Boolean')) return { needed: true, usernameMatches: true, passwordMatches: true };
+    if (expression.includes('const buttons=')) return { submitted: true };
+    if (expression.startsWith('Boolean([')) return false;
+    if (expression.includes('matches:Boolean(input)')) return { needed: true, matches: true };
+    if (expression.includes("const field=\"username\";") || expression.includes("const field=\"password\";")) return { needed: true };
+    throw new Error(`Unexpected sign-in inspection: ${expression}`);
+  };
+
+  assert.equal(await bridge.signInIfNeeded('saved-user', 'saved-password'), true);
+  const usernameFill = expressions.findIndex(expression => expression.includes("const field=\"username\";") && expression.includes('descriptor.set.call'));
+  const passwordFill = expressions.findIndex(expression => expression.includes("const field=\"password\";") && expression.includes('descriptor.set.call'));
+  const credentialsCheck = expressions.findIndex(expression => expression.includes('usernameMatches:Boolean'));
+  const submit = expressions.findIndex(expression => expression.includes('const buttons='));
+  assert.ok(usernameFill >= 0 && passwordFill > usernameFill);
+  assert.ok(credentialsCheck > passwordFill);
+  assert.ok(submit > credentialsCheck);
 });
 
 
