@@ -198,6 +198,8 @@ function scheduleAuto(item) {
     if (!autoSend || !watching || item.status !== 'waiting') return;
     try {
       item.reply = requireReadableReply(item.reply);
+      await bridge.openConversation(item.conversation);
+      if (!autoSend || !watching || item.status !== 'waiting') return;
       await bridge.typeAndSend(
         item.reply,
         item.conversation,
