@@ -1,4 +1,5 @@
 # Lovense Remote Reply Assistant
+[![Build Windows release](https://github.com/mrjohndowe/FOLDERS_CREATOR/actions/workflows/windows-release.yml/badge.svg?branch=main)](https://github.com/mrjohndowe/FOLDERS_CREATOR/actions/workflows/windows-release.yml)
 
 A personal, localhost-only review bot for the **Lovense Remote Windows app**. It watches the conversation that is currently open in Lovense Remote, detects new incoming text messages, prepares a reply, and lets you review or edit it before anything is sent.
 
