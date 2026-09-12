@@ -20,12 +20,13 @@ function decimal(value, fallback, min, max) {
 export function loadRemoteConfig(env = loadPersonalConfig()) {
   const replyProvider = String(env.REPLY_PROVIDER || 'template').toLowerCase();
   if (!providers.has(replyProvider)) throw new Error('REPLY_PROVIDER must be template, ollama, or openai.');
+  const configuredPollMs = integer(env.LOVENSE_REMOTE_POLL_MS, 250, 100, 30000);
   const config = {
     port: integer(env.PORT, 3000, 1, 65535),
     accessToken: env.CHATBOT_ACCESS_TOKEN || '',
     debugUrl: String(env.LOVENSE_REMOTE_DEBUG_URL || 'http://127.0.0.1:9223').replace(/\/$/, ''),
     remoteExecutable: String(env.LOVENSE_REMOTE_EXECUTABLE || path.join(process.env.LOCALAPPDATA || '', 'Lovense', 'Remote', 'Lovense_Remote.exe')).trim(),
-    pollMs: integer(env.LOVENSE_REMOTE_POLL_MS, 2500, 1000, 30000),
+    pollMs: configuredPollMs === 2500 ? 250 : configuredPollMs,
     monitorEnabled: enabled(env.ENABLE_REMOTE_MONITOR, true),
     autoOpenMessages: enabled(env.AUTO_OPEN_MESSAGES, true),
     autoSend: enabled(env.ENABLE_AUTO_SEND, false),

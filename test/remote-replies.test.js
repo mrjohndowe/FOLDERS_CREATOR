@@ -43,7 +43,7 @@ test('loads safe localhost review defaults', () => {
   assert.equal(config.autoSendMaxDelayMs, 25000);
   assert.equal(config.autoSendTypingMsPerChar, 45);
   assert.equal(config.replyProvider, 'template');
-  assert.equal(config.pollMs, 2500);
+  assert.equal(config.pollMs, 250);
   assert.match(config.replySystemPrompt, /genuine conversation/);
   assert.match(config.replySystemPrompt, /only when the conversation invites it/);
   assert.equal(config.conversationMemoryMessages, 24);
@@ -196,6 +196,13 @@ test('does not send an authorization header to local Ollama without a key', asyn
   };
   await generateReply(loadRemoteConfig({ REPLY_PROVIDER: 'ollama' }), 'Hello', fetchImpl);
   assert.equal(requestOptions.headers.authorization, undefined);
+});
+
+test('uses near-instant message detection and upgrades the old 2500ms default', () => {
+  assert.equal(loadRemoteConfig({}).pollMs, 250);
+  assert.equal(loadRemoteConfig({ LOVENSE_REMOTE_POLL_MS: '2500' }).pollMs, 250);
+  assert.equal(loadRemoteConfig({ LOVENSE_REMOTE_POLL_MS: '500' }).pollMs, 500);
+  assert.equal(loadRemoteConfig({ LOVENSE_REMOTE_POLL_MS: '50' }).pollMs, 100);
 });
 
 test('keeps retrying transient reply failures until a result is returned', async () => {

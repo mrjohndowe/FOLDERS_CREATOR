@@ -17,6 +17,14 @@ test('dashboard settings update only named config values while retaining comment
   assert.match(result, /UNRELATED=value/);
 });
 
+test('dashboard settings can update the INI-backed message detection interval', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'lovense-config-'));
+  const filename = path.join(cwd, 'config.ini');
+  await writeFile(filename, 'LOVENSE_REMOTE_POLL_MS=2500 ; old default\r\n', 'utf8');
+  await saveDashboardSettings({ LOVENSE_REMOTE_POLL_MS: '250' }, { cwd });
+  assert.match(await readFile(filename, 'utf8'), /LOVENSE_REMOTE_POLL_MS=250 ; old default/);
+});
+
 test('dashboard settings reject multiline values before writing', async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), 'lovense-config-'));
   await writeFile(path.join(cwd, 'config.ini'), 'CHAT_FIRST_NAME=Old\r\n', 'utf8');
