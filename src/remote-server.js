@@ -235,7 +235,7 @@ async function processFreshMessages(snapshot, fresh, { source = 'incoming' } = {
   if (!fresh.length) return;
   const combinedMessage = fresh.map(item => item.text).join('\n');
   const history = conversationMemories.get(snapshot.conversation) || [];
-  const generatedReply = await generateReply(config, combinedMessage, globalThis.fetch, { history });
+  const generatedReply = await generateReply(config, combinedMessage, globalThis.fetch, { history, shouldContinue: () => watching });
   const quality = inspectReplyQuality(generatedReply);
   const reply = quality.ok ? dedupeReply(snapshot.conversation, quality.reply) : String(generatedReply || '').trim();
   rememberConversationTurn(snapshot.conversation, 'user', combinedMessage);

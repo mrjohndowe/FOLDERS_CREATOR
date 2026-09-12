@@ -51,11 +51,32 @@ function templateReply(config, message, history = []) {
   return choose(['Tell me more—what happened next?', 'That’s interesting. How do you feel about it?', 'I’m listening. What made you think of that?', 'Mmm, I like the way you’re thinking. Keep talking 😉']);
 }
 
-async function requestJson(url, options, fetchImpl) {
-  const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(30_000) });
+async function requestJson(url, options, fetchImpl, timeoutMs) {
+  const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error?.message || body.error || `Reply service returned HTTP ${response.status}.`);
+  if (!response.ok) {
+    const error = new Error(body.error?.message || body.error || `Reply service returned HTTP ${response.status}.`);
+    error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+    throw error;
+  }
   return body;
+}
+
+async function retryReply(operation, {
+  shouldContinue = () => true,
+  waitImpl = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  retryDelayMs = 2_000
+} = {}) {
+  while (shouldContinue()) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error?.retryable === false) throw error;
+      if (!shouldContinue()) throw new Error('Reply generation was cancelled.');
+      await waitImpl(retryDelayMs);
+    }
+  }
+  throw new Error('Reply generation was cancelled.');
 }
 
 export async function generateReply(config, message, fetchImpl = globalThis.fetch, options = {}) {
@@ -64,15 +85,20 @@ export async function generateReply(config, message, fetchImpl = globalThis.fetc
   if (config.replyProvider === 'template') return compact(expandedTemplateReply(config, message, history), maxReplyChars);
   const includeHistory = config.replyProvider === 'ollama' || config.sendMemoryToOpenAI;
   const systemPrompt = options.systemPrompt || config.replySystemPrompt;
+  const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs) ? Math.max(1, options.requestTimeoutMs) : 30_000;
   const messages = [{ role: 'system', content: systemPrompt }, ...(includeHistory ? history : []), { role: 'user', content: String(message || '') }];
   if (config.replyProvider === 'ollama') {
     const headers = { 'content-type': 'application/json' };
     if (config.ollamaApiKey) headers.authorization = `Bearer ${config.ollamaApiKey}`;
-    const body = await requestJson(`${config.ollamaUrl}/api/chat`, { method: 'POST', headers, body: JSON.stringify({ model: config.replyModel, messages, stream: false }) }, fetchImpl);
-    return compact(body.message?.content, maxReplyChars);
+    return retryReply(async () => {
+      const body = await requestJson(`${config.ollamaUrl}/api/chat`, { method: 'POST', headers, body: JSON.stringify({ model: config.replyModel, messages, stream: false }) }, fetchImpl, requestTimeoutMs);
+      return compact(body.message?.content, maxReplyChars);
+    }, options);
   }
-  const body = await requestJson(`${config.openaiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${config.openaiApiKey}` }, body: JSON.stringify({ model: config.replyModel, messages, temperature: 0.7 }) }, fetchImpl);
-  return compact(body.choices?.[0]?.message?.content, maxReplyChars);
+  return retryReply(async () => {
+    const body = await requestJson(`${config.openaiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${config.openaiApiKey}` }, body: JSON.stringify({ model: config.replyModel, messages, temperature: 0.7 }) }, fetchImpl, requestTimeoutMs);
+    return compact(body.choices?.[0]?.message?.content, maxReplyChars);
+  }, options);
 }
 
 export function createReplyDeduper(historyLimit = 100) {

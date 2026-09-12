@@ -198,6 +198,55 @@ test('does not send an authorization header to local Ollama without a key', asyn
   assert.equal(requestOptions.headers.authorization, undefined);
 });
 
+test('keeps retrying transient reply failures until a result is returned', async () => {
+  let attempts = 0;
+  const waits = [];
+  const fetchImpl = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new DOMException('The operation timed out.', 'TimeoutError');
+    if (attempts === 2) return { ok: false, status: 503, json: async () => ({ error: 'Temporarily unavailable' }) };
+    if (attempts === 3) return { ok: true, status: 200, json: async () => ({ message: { content: '' } }) };
+    return { ok: true, status: 200, json: async () => ({ message: { content: 'Recovered reply' } }) };
+  };
+  const reply = await generateReply(loadRemoteConfig({ REPLY_PROVIDER: 'ollama' }), 'Hello', fetchImpl, {
+    waitImpl: async milliseconds => waits.push(milliseconds),
+    retryDelayMs: 25
+  });
+  assert.equal(reply, 'Recovered reply');
+  assert.equal(attempts, 4);
+  assert.deepEqual(waits, [25, 25, 25]);
+});
+
+test('stops retrying when monitoring cancellation is requested', async () => {
+  let attempts = 0;
+  let active = true;
+  const fetchImpl = async () => {
+    attempts += 1;
+    throw new DOMException('The operation timed out.', 'TimeoutError');
+  };
+  await assert.rejects(
+    () => generateReply(loadRemoteConfig({ REPLY_PROVIDER: 'ollama' }), 'Hello', fetchImpl, {
+      shouldContinue: () => active,
+      waitImpl: async () => { active = false; }
+    }),
+    /cancelled/
+  );
+  assert.equal(attempts, 1);
+});
+
+test('does not retry permanent reply-service authentication errors', async () => {
+  let attempts = 0;
+  const fetchImpl = async () => {
+    attempts += 1;
+    return { ok: false, status: 401, json: async () => ({ error: { message: 'Invalid API key' } }) };
+  };
+  await assert.rejects(
+    () => generateReply(loadRemoteConfig({ REPLY_PROVIDER: 'ollama' }), 'Hello', fetchImpl, { waitImpl: async () => {} }),
+    /Invalid API key/
+  );
+  assert.equal(attempts, 1);
+});
+
 test('uses per-request studio instructions and length caps for a model reply', async () => {
   let requestBody;
   const fetchImpl = async (_url, options) => {
