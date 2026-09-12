@@ -335,9 +335,18 @@ async function scan({ baseline = false, catchUp = false } = {}) {
     await saveConversationImages(snapshot);
     const incoming = snapshot.messages.filter(item => item.direction === 'incoming' && item.type === 'text' && item.text);
     const keyed = incoming.map(item => ({ ...item, key: fingerprint(snapshot.conversation, `${item.index}\0${item.text}`) }));
+    
+    // Diagnostic logging for message detection
+    if (incoming.length > 0) {
+      console.log(`[DEBUG] Scan detected ${incoming.length} incoming messages in conversation "${snapshot.conversation}"`);
+      console.log(`[DEBUG] Message keys: ${keyed.map(k => k.key).slice(0, 3).join(', ')}${keyed.length > 3 ? '...' : ''}`);
+      console.log(`[DEBUG] Seen set size: ${seen.size}`);
+    }
+    
     let processedFresh = false;
 
     if (unreadTarget && snapshot.conversation.toLocaleLowerCase('en-US') === unreadTarget.conversation.toLocaleLowerCase('en-US')) {
+      console.log(`[DEBUG] Processing unread target: ${unreadTarget.conversation} with ${unreadTarget.unreadCount} unread messages`);
       const fresh = keyed.slice(-Math.min(unreadTarget.unreadCount, keyed.length));
       const freshIndexes = new Set(fresh.map(item => item.index));
       seedConversationMemory(snapshot.conversation, snapshot.messages.filter(item => !freshIndexes.has(item.index)));
@@ -345,7 +354,9 @@ async function scan({ baseline = false, catchUp = false } = {}) {
       await processFreshMessages(snapshot, fresh);
       processedFresh = fresh.length > 0;
     } else if (baseline || conversationChanged || requestedCatchUp) {
+      console.log(`[DEBUG] Processing baseline/conversation change/catch up: baseline=${baseline}, conversationChanged=${conversationChanged}, requestedCatchUp=${requestedCatchUp}`);
       const unanswered = autoSend && !replyInProgress ? unrepliedIncomingText(snapshot.messages) : [];
+      console.log(`[DEBUG] Found ${unanswered.length} unanswered incoming messages`);
       const unansweredIndexes = new Set(unanswered.map(item => item.index));
       seedConversationMemory(snapshot.conversation, snapshot.messages.filter(item => !unansweredIndexes.has(item.index)));
       for (const item of keyed) seen.add(item.key);
@@ -355,6 +366,7 @@ async function scan({ baseline = false, catchUp = false } = {}) {
       }
     } else {
       const fresh = keyed.filter(item => !seen.has(item.key));
+      console.log(`[DEBUG] Filtering for fresh messages not in seen set: ${fresh.length} fresh, ${keyed.length} total incoming`);
       for (const item of fresh) seen.add(item.key);
       await processFreshMessages(snapshot, fresh);
       processedFresh = fresh.length > 0;

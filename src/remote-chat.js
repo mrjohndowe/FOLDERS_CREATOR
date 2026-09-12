@@ -274,9 +274,13 @@ export class RemoteChatBridge {
         const imageSrc=String(image?.currentSrc||image?.src||'');
         return {index,direction,type:text?'text':imageSrc?'image':'non-text',text,imageSrc};
       }).filter(item=>item.direction!=='notice');
-      return {ready:Boolean(conversation&&document.querySelector('.w-e-text[contenteditable=true]')&&document.querySelector('.send')),conversation,messages};
+      return {ready:Boolean(conversation&&document.querySelector('.w-e-text[contenteditable=true]')&&document.querySelector('.send')),conversation,messages,debug:{conversation,rowCount:rows.length,messageCount:messages.length,incomingCount:messages.filter(m=>m.direction==='incoming').length}};
     })()`);
     if (!value?.ready) throw new Error('Open a Lovense Remote chat conversation so its title, messages, and editor are visible.');
+    
+    // Add diagnostic logging
+    console.log(`[SNAPSHOT DEBUG] Conversation: "${value.debug.conversation}", Rows: ${value.debug.rowCount}, Messages: ${value.debug.messageCount}, Incoming: ${value.debug.incomingCount}`);
+    
     return {
       conversation: clean(value.conversation),
       messages: (value.messages || []).map(item => {
