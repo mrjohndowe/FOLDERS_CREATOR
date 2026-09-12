@@ -21,3 +21,11 @@ test('Reply Studio can be opened, closed, and dismissed by clicking its backdrop
   assert.match(script, /event\.target === studioModal\) studioModal\.close\(\)/);
   assert.match(stylesheet, /\.studio-modal::backdrop/);
 });
+
+test('Reply Studio takes persona, relationship, and tone from config.ini instead of duplicate inputs', () => {
+  assert.doesNotMatch(html, /id="studio-persona"/);
+  assert.doesNotMatch(html, /id="studio-relationship"/);
+  assert.doesNotMatch(html, /id="studio-tone"/);
+  assert.doesNotMatch(script, /#studio-(?:persona|relationship|tone)/);
+  assert.match(html, /uses the persona, demographics, relationship details, and system prompt saved in your private config\.ini/);
+});

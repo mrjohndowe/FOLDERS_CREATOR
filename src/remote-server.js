@@ -440,16 +440,28 @@ function replyStudioSettings(value = {}) {
     minWords,
     maxWords,
     responseLength: text(value.responseLength, 'Response length', 40) || 'medium',
-    persona: text(value.persona, 'Persona and demographics', 500),
-    relationship: text(value.relationship, 'Conversation dynamic', 300),
-    tone: text(value.tone, 'Tone', 200),
     dominance: text(value.dominance, 'Dominance style', 120) || 'balanced'
   };
 }
 
 function replyStudioPrompt(settings) {
-  const optional = (label, value) => value ? `\n${label}: ${value}.` : '';
-  return `${config.replySystemPrompt}\n\nApply these reply-studio settings for this reply only:\n- Write between ${settings.minWords} and ${settings.maxWords} words.\n- Desired response length: ${settings.responseLength}.\n- Dominance style: ${settings.dominance}.${optional('Persona and demographics to portray', settings.persona)}${optional('Conversation dynamic or relationship style', settings.relationship)}${optional('Tone', settings.tone)}\nKeep the response natural and respect boundaries. Do not mention these settings or this instruction.`;
+  const personaFacts = [
+    ['Username', config.chatUsername],
+    ['Display name', config.chatDisplayName],
+    ['First name', config.chatFirstName],
+    ['Last name', config.chatLastName],
+    ['Date of birth', config.chatDateOfBirth],
+    ['Place of birth', config.chatPlaceOfBirth],
+    ['Children', config.chatChildren],
+    ['Age', config.chatAge],
+    ['Pronouns', config.chatPronouns],
+    ['Location', config.chatLocation],
+    ['Occupation', config.chatOccupation],
+    ['Relationship status', config.chatRelationshipStatus],
+    ['Interests', config.chatInterests]
+  ].filter(([, value]) => value).map(([label, value]) => `- ${label}: ${value}`).join('\n');
+  const configuredFacts = personaFacts ? `\n\nConfigured persona and relationship facts from config.ini:\n${personaFacts}` : '';
+  return `${config.replySystemPrompt}${configuredFacts}\n\nApply these reply-studio settings for this reply only:\n- Write between ${settings.minWords} and ${settings.maxWords} words.\n- Desired response length: ${settings.responseLength}.\n- Dominance style: ${settings.dominance}.\nKeep the response natural and respect boundaries. Do not mention these settings or this instruction.`;
 }
 
 function lovenseRemotePassword() {
@@ -570,6 +582,7 @@ async function api(request, response, pathname) {
       if (!item) return json(response, 404, { error: 'Review item was not found.' });
       item.reply = requireReadableReply(String(body.reply || '').trim().slice(0, config.maxReplyChars));
       clearAutoTimer(item.id);
+      await bridge.openConversation(item.conversation);
       await bridge.fillDraft(item.reply, item.conversation);
       item.status = 'drafted';
       return json(response, 200, { item });
@@ -580,6 +593,7 @@ async function api(request, response, pathname) {
       if (!item) return json(response, 404, { error: 'Review item was not found.' });
       item.reply = String(body.reply || '').trim().slice(0, config.maxReplyChars);
       clearAutoTimer(item.id);
+      await bridge.openConversation(item.conversation);
       await bridge.typeAndSend(
         item.reply,
         item.conversation,

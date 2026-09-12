@@ -177,9 +177,6 @@ function replyStudioPayload() {
       minWords: Number(document.querySelector('#studio-min-words').value),
       maxWords: Number(document.querySelector('#studio-max-words').value),
       responseLength: document.querySelector('#studio-length').value,
-      persona: document.querySelector('#studio-persona').value.trim(),
-      relationship: document.querySelector('#studio-relationship').value.trim(),
-      tone: document.querySelector('#studio-tone').value.trim(),
       dominance: document.querySelector('#studio-dominance').value
     }
   };
