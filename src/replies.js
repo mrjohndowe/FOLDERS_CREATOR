@@ -114,7 +114,7 @@ export async function generateReply(config, message, fetchImpl = globalThis.fetc
   // Reply Studio supplies its own expanded prompt. Normal automated replies
   // must receive the persona fields loaded from the private config.ini.
   const systemPrompt = options.systemPrompt || `${config.replySystemPrompt}${configuredPersonaPrompt(config)}`;
-  const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs) ? Math.max(1, options.requestTimeoutMs) : 30_000;
+  const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs) ? Math.max(1, options.requestTimeoutMs) : config.replyRequestTimeoutMs;
   const messages = [{ role: 'system', content: systemPrompt }, ...(includeHistory ? history : []), { role: 'user', content: String(message || '') }];
   if (config.replyProvider === 'ollama') {
     const headers = { 'content-type': 'application/json' };

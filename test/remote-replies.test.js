@@ -44,12 +44,19 @@ test('loads safe localhost review defaults', () => {
   assert.equal(config.autoSendTypingMsPerChar, 45);
   assert.equal(config.replyProvider, 'template');
   assert.equal(config.pollMs, 250);
+  assert.equal(config.replyRequestTimeoutMs, 120_000);
   assert.match(config.replySystemPrompt, /genuine conversation/);
   assert.match(config.replySystemPrompt, /only when the conversation invites it/);
   assert.equal(config.conversationMemoryMessages, 24);
   assert.equal(config.sendMemoryToOpenAI, false);
   assert.equal(config.ollamaApiKey, '');
   assert.match(config.replySystemPrompt, /consenting adult/);
+});
+
+test('allows an INI-configured per-attempt reply timeout for slow models', () => {
+  assert.equal(loadRemoteConfig({ REPLY_REQUEST_TIMEOUT_SECONDS: '180' }).replyRequestTimeoutMs, 180_000);
+  assert.equal(loadRemoteConfig({ REPLY_REQUEST_TIMEOUT_SECONDS: '5' }).replyRequestTimeoutMs, 10_000);
+  assert.equal(loadRemoteConfig({ REPLY_REQUEST_TIMEOUT_SECONDS: '900' }).replyRequestTimeoutMs, 600_000);
 });
 
 test('automatic sending requires an explicit opt-in and bounded delay', () => {

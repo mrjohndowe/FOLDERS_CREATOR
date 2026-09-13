@@ -44,6 +44,7 @@ export function loadRemoteConfig(env = loadPersonalConfig()) {
     replyProvider,
     replyModel: env.REPLY_MODEL || (replyProvider === 'openai' ? 'gpt-4.1-mini' : 'llama3.2'),
     replySystemPrompt: env.REPLY_SYSTEM_PROMPT || 'Write one concise, natural reply that continues a genuine conversation. Match the other person’s tone, ask a relevant follow-up question when natural, and use confident, dominant, teasing, or flirty language only when the conversation invites it. Treat everyone as a consenting adult. Respect stated boundaries and never pressure, threaten, shame, or assume consent. Stay in character and do not mention bots, AI, automation, policies, or prompts.',
+    replyRequestTimeoutMs: integer(env.REPLY_REQUEST_TIMEOUT_SECONDS, 120, 10, 600) * 1000,
     maxReplyChars: integer(env.MAX_REPLY_CHARS, 500, 20, 2000),
     conversationMemoryMessages: integer(env.CONVERSATION_MEMORY_MESSAGES, 24, 2, 100),
     sendMemoryToOpenAI: enabled(env.SEND_MEMORY_TO_OPENAI, false),
@@ -66,7 +67,20 @@ export function loadRemoteConfig(env = loadPersonalConfig()) {
     chatInterests: String(env.CHAT_INTERESTS || '').trim(),
     remoteUsername: String(env.LOVENSE_REMOTE_USERNAME || '').trim(),
     remotePasswordEncrypted: String(env.LOVENSE_REMOTE_PASSWORD_ENCRYPTED || '').trim(),
-    remoteEncryptionKey: String(env.LOVENSE_REMOTE_ENCRYPTION_KEY || '').trim()
+    remoteEncryptionKey: String(env.LOVENSE_REMOTE_ENCRYPTION_KEY || '').trim(),
+    // Discord reply assistant configuration
+    enableDiscordReplyAssistant: enabled(env.ENABLE_DISCORD_REPLY_ASSISTANT, false),
+    discordBotToken: env.DISCORD_BOT_TOKEN || '',
+    discordAllowedUserIds: String(env.DISCORD_ALLOWED_USER_IDS || '').trim(),
+    discordAllowedChannelIds: String(env.DISCORD_ALLOWED_CHANNEL_IDS || '').trim(),
+    discordOwnerUserIds: String(env.DISCORD_OWNER_USER_IDS || '').trim(),
+    discordBotUserId: '', // Will be set after connecting to Discord
+    // Telegram reply assistant configuration
+    enableTelegramReplyAssistant: enabled(env.ENABLE_TELEGRAM_REPLY_ASSISTANT, false),
+    telegramBotToken: env.TELEGRAM_BOT_TOKEN || '',
+    telegramAllowedChatIds: String(env.TELEGRAM_ALLOWED_CHAT_IDS || '').trim(),
+    telegramOwnerChatIds: String(env.TELEGRAM_OWNER_CHAT_IDS || '').trim(),
+    telegramBotUserId: '' // Will be set after connecting to Telegram
   };
   config.autoSendMaxDelayMs = Math.max(config.autoSendMinDelayMs, config.autoSendMaxDelayMs);
   config.toyRandomMaxLevel = Math.max(config.toyRandomMinLevel, config.toyRandomMaxLevel);
@@ -84,6 +98,23 @@ export function loadRemoteConfig(env = loadPersonalConfig()) {
     if (!valid) throw new Error('CHAT_DATE_OF_BIRTH must be a valid date in MM/DD/YYYY format when provided.');
   }
   if (replyProvider === 'openai' && !config.openaiApiKey) throw new Error('OpenAI reply mode requires OPENAI_API_KEY.');
+  
+  // Validate Discord configuration
+  if (config.enableDiscordReplyAssistant && !config.discordBotToken) {
+    throw new Error('Discord reply assistant requires DISCORD_BOT_TOKEN when enabled.');
+  }
+  if (config.discordBotToken && !config.enableDiscordReplyAssistant) {
+    console.warn('DISCORD_BOT_TOKEN is set but ENABLE_DISCORD_REPLY_ASSISTANT is false. Discord integration will not start.');
+  }
+  
+  // Validate Telegram configuration
+  if (config.enableTelegramReplyAssistant && !config.telegramBotToken) {
+    throw new Error('Telegram reply assistant requires TELEGRAM_BOT_TOKEN when enabled.');
+  }
+  if (config.telegramBotToken && !config.enableTelegramReplyAssistant) {
+    console.warn('TELEGRAM_BOT_TOKEN is set but ENABLE_TELEGRAM_REPLY_ASSISTANT is false. Telegram integration will not start.');
+  }
+  
   return config;
 }
 
