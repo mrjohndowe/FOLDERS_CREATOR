@@ -1,5 +1,11 @@
 import { expandedTemplateReply } from './template-responder.js';
 
+const BURN_PICTURE_NOTICE = "I can't receive burn pictures on the computer version of Lovense because they don't show up for me. Please send it as a regular picture instead.";
+
+export function isBurnPictureMarker(message) {
+  return /\[burnpicture\s*\[/i.test(String(message || ''));
+}
+
 function compact(value, maxLength) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) throw new Error('The reply service returned an empty response.');
@@ -82,6 +88,7 @@ async function retryReply(operation, {
 export async function generateReply(config, message, fetchImpl = globalThis.fetch, options = {}) {
   const history = Array.isArray(options.history) ? options.history.slice(-config.conversationMemoryMessages) : [];
   const maxReplyChars = Number.isInteger(options.maxReplyChars) ? options.maxReplyChars : config.maxReplyChars;
+  if (isBurnPictureMarker(message)) return compact(BURN_PICTURE_NOTICE, maxReplyChars);
   if (config.replyProvider === 'template') return compact(expandedTemplateReply(config, message, history), maxReplyChars);
   const includeHistory = config.replyProvider === 'ollama' || config.sendMemoryToOpenAI;
   const systemPrompt = options.systemPrompt || config.replySystemPrompt;

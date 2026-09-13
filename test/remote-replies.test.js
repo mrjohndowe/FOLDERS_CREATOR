@@ -27,7 +27,7 @@ test('offline word library supports a large grammar-aware response space', () =>
 });
 import { loadRemoteConfig } from '../src/remote-config.js';
 import { fingerprint } from '../src/remote-chat.js';
-import { createReplyDeduper, generateReply } from '../src/replies.js';
+import { createReplyDeduper, generateReply, isBurnPictureMarker } from '../src/replies.js';
 
 test('loads safe localhost review defaults', () => {
   const config = loadRemoteConfig({});
@@ -73,6 +73,16 @@ test('template mode generates bounded replies without a network call', async () 
   const reply = await generateReply(config, 'Hello there', () => { throw new Error('network must not be used'); });
   assert.match(reply, /day|mood|doing|going|mind|brought/i);
   assert.ok(reply.length <= 80);
+});
+
+test('burn-picture markers always receive the computer-client notice without calling a reply provider', async () => {
+  const config = loadRemoteConfig({ REPLY_PROVIDER: 'openai', OPENAI_API_KEY: 'test' });
+  const reply = await generateReply(config, '[burnpicture[private-image-token]', () => {
+    throw new Error('reply provider must not be called');
+  });
+  assert.equal(isBurnPictureMarker('[BURNPICTURE[private-image-token]'), true);
+  assert.equal(isBurnPictureMarker('[burnpicture]'), false);
+  assert.equal(reply, "I can't receive burn pictures on the computer version of Lovense because they don't show up for me. Please send it as a regular picture instead.");
 });
 test('one-word greetings can receive simple human-style replies', async () => {
   const config = loadRemoteConfig({});

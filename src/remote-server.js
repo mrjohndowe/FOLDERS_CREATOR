@@ -7,7 +7,7 @@ import { loadRemoteConfig } from './remote-config.js';
 import { loadPersonalConfig } from './ini-config.js';
 import { RemoteChatBridge, fingerprint } from './remote-chat.js';
 import { createFollowUpTracker } from './follow-up.js';
-import { createReplyDeduper, generateReply } from './replies.js';
+import { createReplyDeduper, generateReply, isBurnPictureMarker } from './replies.js';
 import { inspectReplyQuality, requireReadableReply } from './reply-quality.js';
 import { unrepliedIncomingText } from './reply-catchup.js';
 import { chooseRandomToyControl, randomDelayMs } from './toy-random.js';
@@ -237,7 +237,9 @@ async function processFreshMessages(snapshot, fresh, { source = 'incoming' } = {
   const history = conversationMemories.get(snapshot.conversation) || [];
   const generatedReply = await generateReply(config, combinedMessage, globalThis.fetch, { history, shouldContinue: () => watching });
   const quality = inspectReplyQuality(generatedReply);
-  const reply = quality.ok ? dedupeReply(snapshot.conversation, quality.reply) : String(generatedReply || '').trim();
+  const reply = quality.ok
+    ? (isBurnPictureMarker(combinedMessage) ? quality.reply : dedupeReply(snapshot.conversation, quality.reply))
+    : String(generatedReply || '').trim();
   rememberConversationTurn(snapshot.conversation, 'user', combinedMessage);
   if (quality.ok) rememberConversationTurn(snapshot.conversation, 'assistant', reply);
   const review = {

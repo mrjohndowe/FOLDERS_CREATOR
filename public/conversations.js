@@ -59,7 +59,7 @@ function render(conversations, savedMedia) {
     for (const message of conversation.messages) {
       const row = document.createElement('div');
       row.className = `conversation-message ${message.role}`;
-      row.textContent = `${message.role === 'assistant' ? 'Assistant' : 'Other person'}: ${message.content}`;
+      row.textContent = `${message.role === 'assistant' ? 'Assistant' : conversation.conversation }: ${message.content}`;
       card.append(row);
     }
     if (conversation.media.length) {

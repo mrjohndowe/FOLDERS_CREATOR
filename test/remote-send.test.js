@@ -241,6 +241,7 @@ test('discovers unread contacts and confirms the selected conversation after swi
   assert.equal(await bridge.openConversation('JudeLaw'), 'JudeLaw');
   const source = expressions.join(' ');
   assert.match(source, /message-num:not\(\.message-mute\)/);
+  assert.match(source, /badge\?1:0/);
   assert.match(source, /nick-name/);
   assert.match(source, /row\.click\(\)/);
   assert.match(source, /toLocaleLowerCase/);
