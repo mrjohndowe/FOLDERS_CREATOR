@@ -27,7 +27,7 @@ test('offline word library supports a large grammar-aware response space', () =>
 });
 import { loadRemoteConfig } from '../src/remote-config.js';
 import { fingerprint } from '../src/remote-chat.js';
-import { createReplyDeduper, generateReply, isBurnPictureMarker } from '../src/replies.js';
+import { configuredPersonaPrompt, createReplyDeduper, generateReply, isBurnPictureMarker } from '../src/replies.js';
 
 test('loads safe localhost review defaults', () => {
   const config = loadRemoteConfig({});
@@ -180,6 +180,32 @@ test('does not send prior memory to OpenAI unless explicitly enabled', async () 
   assert.equal(requestBody.messages.some(item => item.content === 'private earlier message'), false);
   await generateReply(loadRemoteConfig({ REPLY_PROVIDER: 'openai', OPENAI_API_KEY: 'test', SEND_MEMORY_TO_OPENAI: 'true' }), 'new message', fetchImpl, { history });
   assert.equal(requestBody.messages.some(item => item.content === 'private earlier message'), true);
+});
+
+test('sends configured INI persona facts to Ollama for normal automated replies', async () => {
+  let requestBody;
+  const fetchImpl = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ message: { content: 'A tailored reply' } }) };
+  };
+  const config = loadRemoteConfig({
+    REPLY_PROVIDER: 'ollama',
+    CHAT_DISPLAY_NAME: 'Jordan',
+    CHAT_AGE: '31',
+    CHAT_LOCATION: 'Denver, Colorado',
+    CHAT_OCCUPATION: 'Software engineer',
+    CHAT_RELATIONSHIP_STATUS: 'Single',
+    CHAT_INTERESTS: 'reading and hiking'
+  });
+  assert.equal(await generateReply(config, 'What do you do?', fetchImpl), 'A tailored reply');
+  assert.match(requestBody.messages[0].content, /Configured persona facts from config\.ini/);
+  assert.match(requestBody.messages[0].content, /Display name: Jordan/);
+  assert.match(requestBody.messages[0].content, /Age: 31/);
+  assert.match(requestBody.messages[0].content, /Location: Denver, Colorado/);
+  assert.match(requestBody.messages[0].content, /Occupation: Software engineer/);
+  assert.match(requestBody.messages[0].content, /Relationship status: Single/);
+  assert.match(requestBody.messages[0].content, /Interests: reading and hiking/);
+  assert.equal(configuredPersonaPrompt(loadRemoteConfig({})), '');
 });
 
 

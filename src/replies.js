@@ -6,6 +6,26 @@ export function isBurnPictureMarker(message) {
   return /\[burnpicture\s*\[/i.test(String(message || ''));
 }
 
+export function configuredPersonaPrompt(config) {
+  const facts = [
+    ['Username', config.chatUsername],
+    ['Display name', config.chatDisplayName],
+    ['First name', config.chatFirstName],
+    ['Last name', config.chatLastName],
+    ['Date of birth', config.chatDateOfBirth],
+    ['Place of birth', config.chatPlaceOfBirth],
+    ['Children', config.chatChildren],
+    ['Age', config.chatAge],
+    ['Pronouns', config.chatPronouns],
+    ['Location', config.chatLocation],
+    ['Occupation', config.chatOccupation],
+    ['Relationship status', config.chatRelationshipStatus],
+    ['Interests', config.chatInterests]
+  ].filter(([, value]) => value);
+  if (!facts.length) return '';
+  return `\n\nConfigured persona facts from config.ini:\n${facts.map(([label, value]) => `- ${label}: ${value}`).join('\n')}\nUse these as the canonical persona facts when relevant. Do not invent or contradict personal details.`;
+}
+
 function compact(value, maxLength) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) throw new Error('The reply service returned an empty response.');
@@ -91,7 +111,9 @@ export async function generateReply(config, message, fetchImpl = globalThis.fetc
   if (isBurnPictureMarker(message)) return compact(BURN_PICTURE_NOTICE, maxReplyChars);
   if (config.replyProvider === 'template') return compact(expandedTemplateReply(config, message, history), maxReplyChars);
   const includeHistory = config.replyProvider === 'ollama' || config.sendMemoryToOpenAI;
-  const systemPrompt = options.systemPrompt || config.replySystemPrompt;
+  // Reply Studio supplies its own expanded prompt. Normal automated replies
+  // must receive the persona fields loaded from the private config.ini.
+  const systemPrompt = options.systemPrompt || `${config.replySystemPrompt}${configuredPersonaPrompt(config)}`;
   const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs) ? Math.max(1, options.requestTimeoutMs) : 30_000;
   const messages = [{ role: 'system', content: systemPrompt }, ...(includeHistory ? history : []), { role: 'user', content: String(message || '') }];
   if (config.replyProvider === 'ollama') {
