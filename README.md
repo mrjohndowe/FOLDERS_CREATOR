@@ -8,7 +8,7 @@ This project does not use the Lovense developer API, pairing callbacks, Cloudfla
 
 - Detects visible unread-count badges and processes unread conversations one at a time.
 - Distinguishes incoming `.left .friend-msg` entries from outgoing `.right` entries.
-- Saves visible Lovense conversation pictures locally for later viewing, while continuing to ignore pictures, patterns, toy requests, notices, mobile-only `[vowgameinvitecard]` game invitations, and other non-text entries when deciding whether to generate a reply.
+- Saves visible Lovense conversation pictures locally for later viewing. A received `[burnpicture[` marker always gets a clear reply that the computer version of Lovense cannot display burn pictures and asks for a regular picture instead; pictures, patterns, toy requests, notices, mobile-only `[vowgameinvitecard]` game invitations, and other non-text entries remain ignored when deciding whether to generate a reply.
 - Marks all visible history as already seen when monitoring starts or you switch conversations.
 - Queues only genuinely new incoming text for review.
 - Supports explicit opt-in automatic sending with a randomized reaction and reply-length typing delay, a readability check, and a final exact draft verification before Lovense Send is clicked.

@@ -224,9 +224,12 @@ export class RemoteChatBridge {
       return [...document.querySelectorAll('li.contact-lis')].map((row,index)=>{
         const conversation=tidy(row.querySelector('.nick-name')?.innerText);
         const badge=row.querySelector('.message-num:not(.message-mute)');
-        const unreadCount=Number.parseInt(tidy(badge?.innerText),10);
+        const parsedUnreadCount=Number.parseInt(tidy(badge?.innerText),10);
+        // Some Lovense builds render an unread dot with no visible numeric count.
+        // A non-muted badge still means this contact has at least one unread message.
+        const unreadCount=Number.isInteger(parsedUnreadCount)&&parsedUnreadCount>0?parsedUnreadCount:badge?1:0;
         const preview=tidy(row.querySelector('.last-msg')?.innerText);
-        return {index,conversation,preview,unreadCount:Number.isInteger(unreadCount)?unreadCount:0,current:row.classList.contains('current-lis')};
+        return {index,conversation,preview,unreadCount,current:row.classList.contains('current-lis')};
       }).filter(item=>item.conversation&&item.unreadCount>0);
     })()`);
     return Array.isArray(value) ? value.map(item => ({
